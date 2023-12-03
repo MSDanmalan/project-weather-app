@@ -17,7 +17,6 @@ function populateDisplay() {
 
     if (inputValue.trim() !== '') {
       const appDetailsObj = await extractWeatherDetails(inputValue);
-      console.log(appDetailsObj);
       cityNameElement.textContent = `${appDetailsObj.name}, `;
       countryElement.textContent = appDetailsObj.country;
       tempElement.textContent = `${appDetailsObj.temp_c} °C`;
