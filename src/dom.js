@@ -1,31 +1,39 @@
-import extractWeatherDetails from './logic';
+import extractWeatherDetails from './logic.js';
 
-const displayElement = document.querySelector('.display');
-const cityNameElement = document.querySelector('.city-name');
-const countryElement = document.querySelector('.country');
-const tempElement = document.querySelector('.temp');
-const feelsLikeElement = document.querySelector('.feels-like');
-const humidityElement = document.querySelector('.humidity');
-const windElement = document.querySelector('.wind');
-const inputCityElement = document.getElementById('city');
-const submitButtonElement = document.getElementById('submit-button');
-const errorMessageElement = document.createElement('p');
+function populateDisplay(documentRef = document, lookupWeather = extractWeatherDetails) {
+  const displayElement = documentRef.querySelector('.display');
+  const cityNameElement = documentRef.querySelector('.city-name');
+  const countryElement = documentRef.querySelector('.country');
+  const tempElement = documentRef.querySelector('.temp');
+  const feelsLikeElement = documentRef.querySelector('.feels-like');
+  const humidityElement = documentRef.querySelector('.humidity');
+  const windElement = documentRef.querySelector('.wind');
+  const inputCityElement = documentRef.getElementById('city');
+  const submitButtonElement = documentRef.getElementById('submit-button');
+  const errorMessageElement = documentRef.createElement('p');
 
-errorMessageElement.setAttribute('role', 'alert');
-errorMessageElement.setAttribute('aria-live', 'polite');
-errorMessageElement.hidden = true;
-submitButtonElement.parentElement.insertAdjacentElement('afterend', errorMessageElement);
+  errorMessageElement.setAttribute('role', 'alert');
+  errorMessageElement.setAttribute('aria-live', 'assertive');
+  errorMessageElement.hidden = true;
+  submitButtonElement.parentElement.insertAdjacentElement('afterend', errorMessageElement);
 
-function populateDisplay() {
   submitButtonElement.addEventListener('click', async (event) => {
     event.preventDefault();
     const inputValue = inputCityElement.value;
 
     if (inputValue.trim() !== '') {
+      errorMessageElement.textContent = '';
+      errorMessageElement.hidden = true;
+      displayElement.setAttribute('style', 'display: none;');
+      cityNameElement.textContent = '';
+      countryElement.textContent = '';
+      tempElement.textContent = '';
+      feelsLikeElement.textContent = '';
+      humidityElement.textContent = '';
+      windElement.textContent = '';
+
       try {
-        const appDetailsObj = await extractWeatherDetails(inputValue);
-        errorMessageElement.textContent = '';
-        errorMessageElement.hidden = true;
+        const appDetailsObj = await lookupWeather(inputValue);
         cityNameElement.textContent = `${appDetailsObj.name}, `;
         countryElement.textContent = appDetailsObj.country;
         tempElement.textContent = `${appDetailsObj.temp_c} °C`;

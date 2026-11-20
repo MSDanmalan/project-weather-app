@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
+import populateDisplay from '../src/dom.js';
 import extractWeatherDetails from '../src/logic.js';
 
 const originalFetch = globalThis.fetch;
@@ -12,6 +13,54 @@ const validWeather = {
   humidity: 71,
   wind_kph: 14.4,
 };
+
+function makeElement() {
+  return {
+    attributes: {},
+    listeners: {},
+    hidden: false,
+    textContent: '',
+    value: '',
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    },
+    addEventListener(name, listener) {
+      this.listeners[name] = listener;
+    },
+  };
+}
+
+function makeDocument() {
+  const elements = {
+    '.display': makeElement(),
+    '.city-name': makeElement(),
+    '.country': makeElement(),
+    '.temp': makeElement(),
+    '.feels-like': makeElement(),
+    '.humidity': makeElement(),
+    '.wind': makeElement(),
+    city: makeElement(),
+    'submit-button': makeElement(),
+  };
+  let errorElement;
+  elements['submit-button'].parentElement = {
+    insertAdjacentElement(position, element) {
+      assert.equal(position, 'afterend');
+      errorElement = element;
+    },
+  };
+
+  return {
+    elements,
+    get errorElement() { return errorElement; },
+    querySelector(selector) { return elements[selector]; },
+    getElementById(id) { return elements[id]; },
+    createElement(tag) {
+      assert.equal(tag, 'p');
+      return makeElement();
+    },
+  };
+}
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -91,4 +140,54 @@ test('maps network failures to a safe message', async () => {
     assert.equal(error.message.includes('network detail'), false);
     return true;
   });
+});
+
+test('renders successful weather using the existing display fields', async () => {
+  const documentRef = makeDocument();
+  const cityInput = documentRef.elements.city;
+  cityInput.value = 'London';
+  populateDisplay(documentRef, async () => validWeather);
+
+  let prevented = false;
+  await documentRef.elements['submit-button'].listeners.click({
+    preventDefault() { prevented = true; },
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(documentRef.elements['.city-name'].textContent, 'St. John’s, ');
+  assert.equal(documentRef.elements['.country'].textContent, 'Canada');
+  assert.equal(documentRef.elements['.temp'].textContent, '12.5 °C');
+  assert.equal(documentRef.elements['.feels-like'].textContent, 'Feels like: 10.2 °C');
+  assert.equal(documentRef.elements['.humidity'].textContent, 'Humidity: 71%');
+  assert.equal(documentRef.elements['.wind'].textContent, 'Wind: 14.4 kmph');
+  assert.equal(documentRef.elements['.display'].attributes.style, 'display: flex;');
+  assert.equal(documentRef.errorElement.hidden, true);
+});
+
+test('clears stale weather and announces a rejected lookup without rejecting the click handler', async () => {
+  const documentRef = makeDocument();
+  const cityInput = documentRef.elements.city;
+  let lookups = 0;
+  cityInput.value = 'London';
+  populateDisplay(documentRef, async () => {
+    lookups += 1;
+    if (lookups > 1) throw new Error('Weather service is temporarily unavailable.');
+    return validWeather;
+  });
+  const click = documentRef.elements['submit-button'].listeners.click;
+
+  await click({ preventDefault() {} });
+  assert.equal(documentRef.elements['.display'].attributes.style, 'display: flex;');
+
+  cityInput.value = 'Paris';
+  await assert.doesNotReject(click({ preventDefault() {} }));
+
+  assert.equal(documentRef.elements['.display'].attributes.style, 'display: none;');
+  for (const selector of ['.city-name', '.country', '.temp', '.feels-like', '.humidity', '.wind']) {
+    assert.equal(documentRef.elements[selector].textContent, '');
+  }
+  assert.equal(documentRef.errorElement.textContent, 'Weather service is temporarily unavailable.');
+  assert.equal(documentRef.errorElement.hidden, false);
+  assert.equal(documentRef.errorElement.attributes.role, 'alert');
+  assert.equal(documentRef.errorElement.attributes['aria-live'], 'assertive');
 });

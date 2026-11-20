@@ -18,7 +18,7 @@ To test locally, set `WEATHER_API_KEY` in `worker/.dev.vars`. Keep this file pri
 npx wrangler secret put WEATHER_API_KEY --config worker/wrangler.toml
 ```
 
-The Worker credential is never stored in this repository. The existing frontend integration remains unchanged during Phase 1 and must still be treated as client-visible until it is migrated.
+The frontend now calls this Worker and does not receive or bundle the WeatherAPI credential. The Worker reads the credential only from `env.WEATHER_API_KEY` when configured.
 
 ## Development and deployment commands
 
@@ -40,4 +40,4 @@ npm run worker:deploy
 - Upstream requests time out after five seconds. Client responses do not include upstream error details.
 - Wrangler query-string redaction is enabled so query strings in Cloudflare logs and traces are removed. Do not add custom logging of secrets or full upstream URLs.
 
-The Worker is separate from the existing browser integration. The frontend migration is a later phase.
+The static GitHub Pages frontend is integrated with this Worker through the configured public Worker hostname.
