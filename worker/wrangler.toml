@@ -1,0 +1,19 @@
+name = "project-weather-api"
+main = "index.mjs"
+compatibility_date = "2026-11-19"
+workers_dev = true
+
+[observability]
+enabled = true
+redact_query_string = true
+
+[dev]
+port = 8787
+
+[[ratelimits]]
+name = "WEATHER_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60
