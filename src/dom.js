@@ -9,6 +9,12 @@ const humidityElement = document.querySelector('.humidity');
 const windElement = document.querySelector('.wind');
 const inputCityElement = document.getElementById('city');
 const submitButtonElement = document.getElementById('submit-button');
+const errorMessageElement = document.createElement('p');
+
+errorMessageElement.setAttribute('role', 'alert');
+errorMessageElement.setAttribute('aria-live', 'polite');
+errorMessageElement.hidden = true;
+submitButtonElement.parentElement.insertAdjacentElement('afterend', errorMessageElement);
 
 function populateDisplay() {
   submitButtonElement.addEventListener('click', async (event) => {
@@ -16,14 +22,23 @@ function populateDisplay() {
     const inputValue = inputCityElement.value;
 
     if (inputValue.trim() !== '') {
-      const appDetailsObj = await extractWeatherDetails(inputValue);
-      cityNameElement.textContent = `${appDetailsObj.name}, `;
-      countryElement.textContent = appDetailsObj.country;
-      tempElement.textContent = `${appDetailsObj.temp_c} °C`;
-      feelsLikeElement.textContent = `Feels like: ${appDetailsObj.feelslike_c} °C`;
-      humidityElement.textContent = `Humidity: ${appDetailsObj.humidity}%`;
-      windElement.textContent = `Wind: ${appDetailsObj.wind_kph} kmph`;
-      displayElement.setAttribute('style', 'display: flex;');
+      try {
+        const appDetailsObj = await extractWeatherDetails(inputValue);
+        errorMessageElement.textContent = '';
+        errorMessageElement.hidden = true;
+        cityNameElement.textContent = `${appDetailsObj.name}, `;
+        countryElement.textContent = appDetailsObj.country;
+        tempElement.textContent = `${appDetailsObj.temp_c} °C`;
+        feelsLikeElement.textContent = `Feels like: ${appDetailsObj.feelslike_c} °C`;
+        humidityElement.textContent = `Humidity: ${appDetailsObj.humidity}%`;
+        windElement.textContent = `Wind: ${appDetailsObj.wind_kph} kmph`;
+        displayElement.setAttribute('style', 'display: flex;');
+      } catch (error) {
+        errorMessageElement.textContent = error instanceof Error
+          ? error.message
+          : 'Unable to retrieve weather. Please try again.';
+        errorMessageElement.hidden = false;
+      }
     }
   });
 }
