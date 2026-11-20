@@ -276,6 +276,85 @@ test('returns generic errors for upstream HTTP and malformed JSON failures witho
   });
 });
 
+test('maps WeatherAPI location-not-found errors to a safe 404', async () => {
+  globalThis.fetch = async () => Response.json({
+    error: { code: 1006, message: `No matching location. Sensitive detail: ${API_KEY}` },
+  }, { status: 400 });
+
+  const response = await invoke(makeRequest());
+  const body = await response.text();
+  assert.equal(response.status, 404);
+  assert.deepEqual(JSON.parse(body), {
+    error: {
+      code: 'city_not_found',
+      message: 'City not found. Please check the city name and try again.',
+    },
+  });
+  assert.equal(body.includes(API_KEY), false);
+  assert.equal(body.includes('No matching location'), false);
+});
+
+test('malformed and unreadable upstream error bodies fall back to generic 502', async (t) => {
+  const cases = [
+    ['malformed JSON', async () => new Response('{', { status: 400 })],
+    ['missing provider code', async () => Response.json({ error: { message: 'No details exposed' } }, { status: 400 })],
+    ['unreadable body', async () => ({
+      ok: false,
+      status: 400,
+      json: async () => { throw new Error(`unreadable body ${API_KEY}`); },
+    })],
+  ];
+
+  for (const [label, createResponse] of cases) {
+    await t.test(label, async () => {
+      globalThis.fetch = createResponse;
+      const response = await invoke(makeRequest());
+      const body = await response.text();
+      assert.equal(response.status, 502);
+      assert.deepEqual(JSON.parse(body), {
+        error: {
+          code: 'upstream_failure',
+          message: 'Unable to retrieve weather right now.',
+        },
+      });
+      assert.equal(body.includes(API_KEY), false);
+      assert.equal(body.includes('No details exposed'), false);
+    });
+  }
+});
+
+test('keeps authentication and quota errors generic', async (t) => {
+  for (const code of [1002, 2006, 2007]) {
+    await t.test(`provider code ${code}`, async () => {
+      globalThis.fetch = async () => Response.json({
+        error: { code, message: `Provider detail with ${API_KEY}` },
+      }, { status: 400 });
+      const response = await invoke(makeRequest());
+      const body = await response.text();
+      assert.equal(response.status, 502);
+      assert.match(body, /upstream_failure/u);
+      assert.equal(body.includes(API_KEY), false);
+      assert.equal(body.includes('Provider detail'), false);
+    });
+  }
+});
+
+test('preserves the timeout response while reading an upstream error body', async () => {
+  globalThis.fetch = async (_url, { signal }) => ({
+    ok: false,
+    status: 400,
+    json: () => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error(`body timeout ${API_KEY}`)), { once: true });
+    }),
+  });
+
+  const response = await invoke(makeRequest());
+  const body = await response.text();
+  assert.equal(response.status, 504);
+  assert.equal(body.includes(API_KEY), false);
+  assert.equal(body.includes('body timeout'), false);
+});
+
 test('handles upstream timeouts without exposing details or caching', async () => {
   const { entries } = installCache();
   globalThis.fetch = async (_url, { signal }) => new Promise((_resolve, reject) => {

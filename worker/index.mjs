@@ -138,6 +138,28 @@ async function handleWeather(request, env, ctx, origin, url) {
   try {
     const upstream = await fetch(upstreamUrl, { signal: controller.signal });
     if (!upstream.ok) {
+      let providerError;
+      try {
+        providerError = await upstream.json();
+      } catch {
+        if (controller.signal.aborted) {
+          return errorResponse('upstream_timeout', 'Weather provider timed out.', 504, origin);
+        }
+      }
+
+      if (controller.signal.aborted) {
+        return errorResponse('upstream_timeout', 'Weather provider timed out.', 504, origin);
+      }
+
+      if (upstream.status === 400 && providerError?.error?.code === 1006) {
+        return errorResponse(
+          'city_not_found',
+          'City not found. Please check the city name and try again.',
+          404,
+          origin,
+        );
+      }
+
       return errorResponse('upstream_failure', 'Unable to retrieve weather right now.', 502, origin);
     }
     payload = await upstream.json();
